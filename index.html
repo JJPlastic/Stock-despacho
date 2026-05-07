@@ -285,7 +285,7 @@ tbody td.right{text-align:right}
     <div class="kpi" style="--kc:var(--acc)"><div class="kpi-lbl">Total Productos</div><div class="kpi-val" id="s-tot">—</div><div class="kpi-sub">en inventario</div></div>
     <div class="kpi" style="--kc:var(--grn)"><div class="kpi-lbl">Stock OK</div><div class="kpi-val" id="s-ok">—</div><div class="kpi-sub">sin producción urgente</div></div>
     <div class="kpi" style="--kc:var(--red)"><div class="kpi-lbl">A Producir</div><div class="kpi-val" id="s-prod">—</div><div class="kpi-sub">stock insuficiente</div></div>
-    <div class="kpi" style="--kc:var(--ylw)"><div class="kpi-lbl">Total Stock DOC</div><div class="kpi-val" id="s-tdoc">—</div><div class="kpi-sub">docenas disponibles</div></div>
+    <div class="kpi" style="--kc:var(--ylw)"><div class="kpi-lbl">Total Stock DOC</div><div class="kpi-val" id="s-tdoc">—</div><div class="kpi-sub">docenas físicas en almacén</div></div>
   </div>
   <div class="card">
     <div class="ctitle">Inventario de Productos</div>
@@ -297,11 +297,11 @@ tbody td.right{text-align:right}
       <thead><tr>
         <th onclick="sSort('producto')">Producto ↕</th><th onclick="sSort('color')">Color ↕</th>
         <th onclick="sSort('presentacion')" style="text-align:right">Pres. ↕</th>
-        <th onclick="sSort('stock_doc')" style="text-align:right">Stock DOC ↕</th>
-        <th onclick="sSort('stock_paq')" style="text-align:right">Stock PAQ ↕</th>
+        <th onclick="sSort('stock_doc')" style="text-align:right">Físico DOC ↕</th>
+        <th onclick="sSort('stock_paq')" style="text-align:right">Físico PAQ ↕</th>
         <th onclick="sSort('solicitado_doc')" style="text-align:right">Solicitado DOC ↕</th>
         <th>Cobertura</th>
-        <th onclick="sSort('stock_restante_doc')" style="text-align:right">Restante DOC ↕</th>
+        <th onclick="sSort('stock_restante_doc')" style="text-align:right">Disponible DOC ↕</th>
         <th onclick="sSort('producir')">Estado ↕</th>
       </tr></thead>
       <tbody id="s-body"></tbody>
@@ -507,26 +507,45 @@ function closeUpload(){ $('upload-modal').classList.remove('on'); }
 // ══════════════════════════════════════════════
 function normalizeDespacho(rows){
   return rows.filter(r=>{const op=cl(r['OP-N°']??r['OP-N']??'');return op&&op!=='OP-N°';})
-  .map(r=>({
-    op:cl(r['OP-N°']??r['OP-N']), tipo:cl(r['OP']),
-    forma_pago:cl(r['FORMA.PAGO']??r['FORMA DE PAGO']),
-    fecha_pedido:fmtDate(r['F. PEDIDO']), fecha_compromiso:fmtDate(r['F. COMPROMISO']),
-    fecha_despacho:fmtDate(r['F. DESPACHO']), cantidad:num(r['Q']),
-    cod:cl(r['COD']), producto:cl(r['PRODUCTOS NO INDUSTRIALES']),
-    cliente:cl(r['CLIENTE']), rango:cl(r['RANGO']),
-    estado:cl(r['ESTADO']), cumple:num(r['¿CUMPLE?']),
-  })).filter(r=>r.op&&r.producto);
+  .map(r=>{
+    const fDesp=fmtDate(r['F. DESPACHO']);
+    const fComp=fmtDate(r['F.COMPROMISO.AUT']??r['F. COMPROMISO.AUT']??r['F. COMPROMISO']);
+    const otif=(fDesp&&fComp&&fDesp<=fComp)?1:0;
+    return{
+      op:cl(r['OP-N°']??r['OP-N']),tipo:cl(r['OP']),
+      forma_pago:cl(r['FORMA.PAGO']??r['FORMA DE PAGO']),
+      fecha_pedido:fmtDate(r['F. PEDIDO']),fecha_compromiso:fmtDate(r['F. COMPROMISO']),
+      fecha_compromiso_aut:fComp,fecha_despacho:fDesp,cantidad:num(r['Q']),
+      cod:cl(r['COD']),producto:cl(r['PRODUCTOS NO INDUSTRIALES']),
+      cliente:cl(r['CLIENTE']),rango:cl(r['RANGO']),
+      estado:cl(r['ESTADO']),cumple:otif,
+    };
+  }).filter(r=>r.op&&r.producto);
 }
 function normalizeStock(rows){
-  return rows.filter(r=>{const p=cl(r['DESCRIPCIÓN DEL PRODUCTO']??'');return p&&p!=='DESCRIPCIÓN DEL PRODUCTO';})
-  .map(r=>({
-    producto:cl(r['DESCRIPCIÓN DEL PRODUCTO']), color:cl(r['COLOR']),
-    presentacion:num(r['PRESENTACIÓN']), stock_paq:num(r['STOCK (PAQ)']),
-    stock_doc:num(r['STOCK (DOC)']), solicitado_doc:num(r['SOLICITADO (DOC)']),
-    solicitado_paq:num(r['SOLICITADO (PAQ)']), producir:cl(r['¿PRODUCIR?']),
-    stock_restante_doc:num(r['STOCK RESTANTE (DOC)']),
-    stock_restante_paq:num(r['STOCK  (PAQ)']??r['STOCK (PAQ).1']),
-  }));
+  // Intentar todas las variantes posibles de nombres de columna
+  return rows.filter(r=>{
+    const keys=Object.keys(r);
+    const pKey=keys.find(k=>k.toUpperCase().includes('DESCRIPCI'));
+    const p=pKey?cl(r[pKey]):'';
+    return p&&!p.toUpperCase().includes('DESCRIPCIÓN DEL')&&p!=='';
+  }).map(r=>{
+    const keys=Object.keys(r);
+    const gk=name=>{ const k=keys.find(kk=>kk.toUpperCase().replace(/\s+/g,' ').trim()===name.toUpperCase().replace(/\s+/g,' ').trim()); return k?r[k]:''; };
+    const prodKey=keys.find(k=>k.toUpperCase().includes('DESCRIPCI'));
+    return{
+      producto:cl(prodKey?r[prodKey]:''),
+      color:cl(gk('COLOR')),
+      presentacion:num(gk('PRESENTACIÓN')||gk('PRESENTACION')),
+      stock_paq:num(gk('FISICO (PAQ)')||gk('STOCK (PAQ)')),
+      stock_doc:num(gk('FISICO (DOC)')||gk('STOCK (DOC)')),
+      solicitado_doc:num(gk('SOLICITADO (DOC)')),
+      solicitado_paq:num(gk('SOLICITADO (PAQ)')),
+      producir:cl(gk('¿PRODUCIR?')||gk('PRODUCIR')),
+      stock_restante_doc:num(gk('DISPONIBLE (DOC)')||gk('STOCK RESTANTE (DOC)')),
+      stock_restante_paq:num(gk('DISPONIBLE (PAQ)')||gk('STOCK RESTANTE (PAQ)')||gk('STOCK  (PAQ)')),
+    };
+  }).filter(r=>r.producto);
 }
 function cl(v){return String(v??'').trim();}
 function num(v){const x=parseFloat(String(v??'').replace(/,/g,'.'));return isNaN(x)?0:x;}
@@ -572,7 +591,7 @@ function buildResumen(){
   html('top-prods',top.map(([p,c])=>`<div class="bar-row"><div class="bar-lbl" title="${p}">${p}</div><div class="bar-track"><div class="bar-fill" style="width:${(c/maxP*100).toFixed(1)}%;background:var(--acc)"></div></div><div class="bar-num">${c}</div></div>`).join(''));
 
   const neg=STOCK.filter(s=>s.producir==='SI').sort((a,b)=>a.stock_restante_doc-b.stock_restante_doc);
-  html('alerts',neg.length?neg.map(s=>`<div class="alert-item"><div><div class="alert-name">${s.producto}</div><div class="alert-det">Stock: ${n(s.stock_doc)} DOC · Solicitado: ${n(s.solicitado_doc)} DOC</div></div><div class="alert-val">${n(s.stock_restante_doc)}</div></div>`).join(''):'<div style="color:var(--grn);font-size:13px">✅ Sin alertas de stock crítico</div>');
+  html('alerts',neg.length?neg.map(s=>`<div class="alert-item"><div><div class="alert-name">${s.producto}</div><div class="alert-det">Físico: ${n(s.stock_doc)} DOC · Solicitado: ${n(s.solicitado_doc)} DOC</div></div><div class="alert-val">${n(s.stock_restante_doc)}</div></div>`).join(''):'<div style="color:var(--grn);font-size:13px">✅ Sin alertas de stock crítico</div>');
 
   const jjp=DESPACHO.filter(d=>d.tipo==='JJP').length,ptk=DESPACHO.filter(d=>d.tipo==='PTK').length,maxOp=Math.max(jjp,ptk,1);
   html('jjp-n',n(jjp));html('ptk-n',n(ptk));
@@ -614,7 +633,7 @@ function sFilter(){const q=$('s-q').value.toLowerCase(),pr=$('s-pr').value;sData
 function sSort(k){if(sSK===k)sSD*=-1;else{sSK=k;sSD=1;}renderS();}
 function renderS(){
   html('s-tot',n(STOCK.length));html('s-ok',n(STOCK.filter(s=>s.producir==='NO').length));
-  html('s-prod',n(STOCK.filter(s=>s.producir==='SI').length));html('s-tdoc',n(STOCK.reduce((a,s)=>a+s.stock_doc,0)));
+  html('s-prod',n(STOCK.filter(s=>s.producir==='SI').length));html('s-tdoc',n(STOCK.reduce((a,s)=>a+s.stock_doc,0))); html('s-tdoc-lbl','docenas físicas');
   const s=sortArr(sData,sSK,sSD),tot=s.length,st=(sPage-1)*PER,pg=s.slice(st,st+PER);
   html('s-body',pg.map(s=>{const p=s.solicitado_doc>0?Math.min(100,s.stock_doc/s.solicitado_doc*100):100;const bc=p>=100?'var(--grn)':p>=50?'var(--ylw)':'var(--red)';const rc=s.stock_restante_doc<0?'var(--red)':s.stock_restante_doc===0?'var(--mut)':'var(--grn)';
     return`<tr><td class="bold">${s.producto}</td><td style="font-size:12px;color:var(--mut)">${s.color||'—'}</td><td class="right">${s.presentacion}</td><td class="right bold">${n(s.stock_doc)}</td><td class="right">${n(s.stock_paq)}</td><td class="right">${n(s.solicitado_doc)}</td><td><div class="sbar"><div class="sbar-track"><div class="sbar-fill" style="width:${p.toFixed(1)}%;background:${bc}"></div></div><div class="sbar-pct">${p.toFixed(0)}%</div></div></td><td class="right bold" style="color:${rc}">${n(s.stock_restante_doc)}</td><td>${s.producir==='SI'?'<span class="bd bd-red">🔴 Producir</span>':'<span class="bd bd-grn">✓ OK</span>'}</td></tr>`;}).join(''));
