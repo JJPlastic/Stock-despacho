@@ -455,18 +455,7 @@ function onFile(file) {
 
       setProgress(30, 'Procesando STOCK…');
       const rawS = XLSX.utils.sheet_to_json(wb.Sheets[sheetS], {defval:''});
-      // DEBUG - mostrar primeras claves del STOCK
-      if(rawS.length>0){
-        const keys = Object.keys(rawS[0]);
-        const preview = JSON.stringify(rawS[0]).slice(0,300);
-        console.log('STOCK keys:', keys);
-        console.log('STOCK row[0]:', preview);
-        alert('STOCK DEBUG\nColumnas: ' + keys.join(' | ') + '\n\nFila 1: ' + preview);
-      } else {
-        alert('STOCK DEBUG: rawS está VACÍO - 0 filas');
-      }
       const normS = normalizeStock(rawS);
-      console.log('normS length:', normS.length);
 
       setProgress(45, 'Borrando datos anteriores…');
       await sbDelete('excel_data');
@@ -542,26 +531,25 @@ function normalizeDespacho(rows){
   }).filter(r=>r.op&&r.producto);
 }
 function normalizeStock(rows){
-  return rows.filter(r=>{
-    // SheetJS usa los encabezados exactos del Excel como claves
-    const p = cl(
-      r['DESCRIPCIÓN DEL PRODUCTO'] ??
-      r['DESCRIPCION DEL PRODUCTO'] ?? ''
-    );
-    return p && p.length > 1;
-  }).map(r=>({
-    producto:           cl(r['DESCRIPCIÓN DEL PRODUCTO'] ?? r['DESCRIPCION DEL PRODUCTO'] ?? ''),
-    color:              cl(r['COLOR'] ?? ''),
-    presentacion:       num(r['PRESENTACIÓN'] ?? r['PRESENTACION'] ?? 0),
-    // Nuevos nombres (archivo actualizado)
-    stock_paq:          num(r['FISICO (PAQ)']      ?? r['STOCK (PAQ)']          ?? 0),
-    stock_doc:          num(r['FISICO (DOC)']      ?? r['STOCK (DOC)']          ?? 0),
-    solicitado_doc:     num(r['SOLICITADO (DOC)']  ?? 0),
-    solicitado_paq:     num(r['SOLICITADO (PAQ)']  ?? 0),
-    producir:           cl(r['¿PRODUCIR?']   ?? r['PRODUCIR']             ?? ''),
-    stock_restante_doc: num(r['DISPONIBLE (DOC)']  ?? r['STOCK RESTANTE (DOC)'] ?? 0),
-    stock_restante_paq: num(r['DISPONIBLE (PAQ)']  ?? r['STOCK  (PAQ)']         ?? r['STOCK (PAQ)'] ?? 0),
-  })).filter(r => r.producto && r.producto.length > 1);
+  return rows
+    .filter(r => {
+      const p = cl(r['¿PRODUCIR?'] ?? ''); // fila valida si tiene PRODUCIR
+      const prod = cl(r['DESCRIPCIÓN DEL PRODUCTO'] ?? '');
+      return prod.length > 1;
+    })
+    .map(r => ({
+      producto:           cl(r['DESCRIPCIÓN DEL PRODUCTO'] ?? ''),
+      color:              cl(r['COLOR'] ?? ''),
+      presentacion:       num(r['PRESENTACIÓN'] ?? 0),
+      stock_paq:          num(r['FISICO (PAQ)'] ?? 0),
+      stock_doc:          num(r['FISICO (DOC)'] ?? 0),
+      solicitado_doc:     num(r['SOLICITADO (DOC)'] ?? 0),
+      solicitado_paq:     num(r['SOLICITADO (PAQ)'] ?? 0),
+      producir:           cl(r['¿PRODUCIR?'] ?? ''),
+      stock_restante_doc: num(r['DISPONIBLE (DOC)'] ?? 0),
+      stock_restante_paq: num(r['DISPONIBLE (PAQ)'] ?? 0),
+    }))
+    .filter(r => r.producto.length > 1);
 }
 function cl(v){return String(v??'').trim();}
 function num(v){const x=parseFloat(String(v??'').replace(/,/g,'.'));return isNaN(x)?0:x;}
