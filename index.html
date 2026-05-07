@@ -508,44 +508,49 @@ function closeUpload(){ $('upload-modal').classList.remove('on'); }
 function normalizeDespacho(rows){
   return rows.filter(r=>{const op=cl(r['OP-N°']??r['OP-N']??'');return op&&op!=='OP-N°';})
   .map(r=>{
-    const fDesp=fmtDate(r['F. DESPACHO']);
-    const fComp=fmtDate(r['F.COMPROMISO.AUT']??r['F. COMPROMISO.AUT']??r['F. COMPROMISO']);
-    const otif=(fDesp&&fComp&&fDesp<=fComp)?1:0;
-    return{
-      op:cl(r['OP-N°']??r['OP-N']),tipo:cl(r['OP']),
-      forma_pago:cl(r['FORMA.PAGO']??r['FORMA DE PAGO']),
-      fecha_pedido:fmtDate(r['F. PEDIDO']),fecha_compromiso:fmtDate(r['F. COMPROMISO']),
-      fecha_compromiso_aut:fComp,fecha_despacho:fDesp,cantidad:num(r['Q']),
-      cod:cl(r['COD']),producto:cl(r['PRODUCTOS NO INDUSTRIALES']),
-      cliente:cl(r['CLIENTE']),rango:cl(r['RANGO']),
-      estado:cl(r['ESTADO']),cumple:otif,
+    const fDesp = fmtDate(r['F. DESPACHO']);
+    const fComp = fmtDate(r['F.COMPROMISO.AUT'] ?? r['F. COMPROMISO.AUT'] ?? r['F. COMPROMISO']);
+    // OTIF: despachado en fecha <= fecha comprometida autorizada
+    const otif = (fDesp && fComp && fDesp <= fComp) ? 1 : 0;
+    return {
+      op:                  cl(r['OP-N°'] ?? r['OP-Nº']),
+      tipo:                cl(r['OP']),
+      forma_pago:          cl(r['FORMA.PAGO'] ?? r['FORMA DE PAGO']),
+      fecha_pedido:        fmtDate(r['F. PEDIDO']),
+      fecha_compromiso:    fmtDate(r['F. COMPROMISO']),
+      fecha_compromiso_aut:fComp,
+      fecha_despacho:      fDesp,
+      cantidad:            num(r['Q']),
+      cod:                 cl(r['COD']),
+      producto:            cl(r['PRODUCTOS NO INDUSTRIALES']),
+      cliente:             cl(r['CLIENTE']),
+      rango:               cl(r['RANGO']),
+      estado:              cl(r['ESTADO']),
+      cumple:              otif,
     };
   }).filter(r=>r.op&&r.producto);
 }
 function normalizeStock(rows){
-  // Intentar todas las variantes posibles de nombres de columna
   return rows.filter(r=>{
-    const keys=Object.keys(r);
-    const pKey=keys.find(k=>k.toUpperCase().includes('DESCRIPCI'));
-    const p=pKey?cl(r[pKey]):'';
-    return p&&!p.toUpperCase().includes('DESCRIPCIÓN DEL')&&p!=='';
-  }).map(r=>{
-    const keys=Object.keys(r);
-    const gk=name=>{ const k=keys.find(kk=>kk.toUpperCase().replace(/\s+/g,' ').trim()===name.toUpperCase().replace(/\s+/g,' ').trim()); return k?r[k]:''; };
-    const prodKey=keys.find(k=>k.toUpperCase().includes('DESCRIPCI'));
-    return{
-      producto:cl(prodKey?r[prodKey]:''),
-      color:cl(gk('COLOR')),
-      presentacion:num(gk('PRESENTACIÓN')||gk('PRESENTACION')),
-      stock_paq:num(gk('FISICO (PAQ)')||gk('STOCK (PAQ)')),
-      stock_doc:num(gk('FISICO (DOC)')||gk('STOCK (DOC)')),
-      solicitado_doc:num(gk('SOLICITADO (DOC)')),
-      solicitado_paq:num(gk('SOLICITADO (PAQ)')),
-      producir:cl(gk('¿PRODUCIR?')||gk('PRODUCIR')),
-      stock_restante_doc:num(gk('DISPONIBLE (DOC)')||gk('STOCK RESTANTE (DOC)')),
-      stock_restante_paq:num(gk('DISPONIBLE (PAQ)')||gk('STOCK RESTANTE (PAQ)')||gk('STOCK  (PAQ)')),
-    };
-  }).filter(r=>r.producto);
+    // SheetJS usa los encabezados exactos del Excel como claves
+    const p = cl(
+      r['DESCRIPCIÓN DEL PRODUCTO'] ??
+      r['DESCRIPCION DEL PRODUCTO'] ?? ''
+    );
+    return p && p.length > 1;
+  }).map(r=>({
+    producto:           cl(r['DESCRIPCIÓN DEL PRODUCTO'] ?? r['DESCRIPCION DEL PRODUCTO'] ?? ''),
+    color:              cl(r['COLOR'] ?? ''),
+    presentacion:       num(r['PRESENTACIÓN'] ?? r['PRESENTACION'] ?? 0),
+    // Nuevos nombres (archivo actualizado)
+    stock_paq:          num(r['FISICO (PAQ)']      ?? r['STOCK (PAQ)']          ?? 0),
+    stock_doc:          num(r['FISICO (DOC)']      ?? r['STOCK (DOC)']          ?? 0),
+    solicitado_doc:     num(r['SOLICITADO (DOC)']  ?? 0),
+    solicitado_paq:     num(r['SOLICITADO (PAQ)']  ?? 0),
+    producir:           cl(r['¿PRODUCIR?']   ?? r['PRODUCIR']             ?? ''),
+    stock_restante_doc: num(r['DISPONIBLE (DOC)']  ?? r['STOCK RESTANTE (DOC)'] ?? 0),
+    stock_restante_paq: num(r['DISPONIBLE (PAQ)']  ?? r['STOCK  (PAQ)']         ?? r['STOCK (PAQ)'] ?? 0),
+  })).filter(r => r.producto && r.producto.length > 1);
 }
 function cl(v){return String(v??'').trim();}
 function num(v){const x=parseFloat(String(v??'').replace(/,/g,'.'));return isNaN(x)?0:x;}
