@@ -531,25 +531,35 @@ function normalizeDespacho(rows){
   }).filter(r=>r.op&&r.producto);
 }
 function normalizeStock(rows){
+  if(!rows||!rows.length) return [];
+  // Buscar clave flexible — ignora tildes, mayúsculas y espacios
+  function fk(obj, ...hints){
+    const keys = Object.keys(obj);
+    for(const hint of hints){
+      const h = hint.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
+      const found = keys.find(k=>{
+        const kn = k.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
+        return kn === h;
+      });
+      if(found !== undefined && obj[found] !== undefined) return obj[found];
+    }
+    return '';
+  }
   return rows
-    .filter(r => {
-      const p = cl(r['¿PRODUCIR?'] ?? ''); // fila valida si tiene PRODUCIR
-      const prod = cl(r['DESCRIPCIÓN DEL PRODUCTO'] ?? '');
-      return prod.length > 1;
-    })
+    .filter(r => cl(fk(r,'DESCRIPCION DEL PRODUCTO','DESCRIPCIONDEL PRODUCTO','DESCRIPCION')).length > 1)
     .map(r => ({
-      producto:           cl(r['DESCRIPCIÓN DEL PRODUCTO'] ?? ''),
-      color:              cl(r['COLOR'] ?? ''),
-      presentacion:       num(r['PRESENTACIÓN'] ?? 0),
-      stock_paq:          num(r['FISICO (PAQ)'] ?? 0),
-      stock_doc:          num(r['FISICO (DOC)'] ?? 0),
-      solicitado_doc:     num(r['SOLICITADO (DOC)'] ?? 0),
-      solicitado_paq:     num(r['SOLICITADO (PAQ)'] ?? 0),
-      producir:           cl(r['¿PRODUCIR?'] ?? ''),
-      stock_restante_doc: num(r['DISPONIBLE (DOC)'] ?? 0),
-      stock_restante_paq: num(r['DISPONIBLE (PAQ)'] ?? 0),
+      producto:           cl(fk(r,'DESCRIPCION DEL PRODUCTO','DESCRIPCION')),
+      color:              cl(fk(r,'COLOR')),
+      presentacion:       num(fk(r,'PRESENTACION')),
+      stock_paq:          num(fk(r,'FISICO PAQ','STOCKPAQ')),
+      stock_doc:          num(fk(r,'FISICO DOC','STOCKDOC')),
+      solicitado_doc:     num(fk(r,'SOLICITADO DOC')),
+      solicitado_paq:     num(fk(r,'SOLICITADO PAQ')),
+      producir:           cl(fk(r,'PRODUCIR')),
+      stock_restante_doc: num(fk(r,'DISPONIBLE DOC','STOCKRESTANTE DOC')),
+      stock_restante_paq: num(fk(r,'DISPONIBLE PAQ','STOCKRESTANTE PAQ')),
     }))
-    .filter(r => r.producto.length > 1);
+    .filter(r => r.producto && r.producto.length > 1);
 }
 function cl(v){return String(v??'').trim();}
 function num(v){const x=parseFloat(String(v??'').replace(/,/g,'.'));return isNaN(x)?0:x;}
