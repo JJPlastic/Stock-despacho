@@ -463,7 +463,17 @@ function onFile(file) {
 
       setProgress(30, 'Procesando STOCK…');
       const rawS = XLSX.utils.sheet_to_json(wb.Sheets[sheetS], {defval:''});
+      
+      // DEBUG: ver primeras claves de rawS
+      if(rawS.length>0){
+        const k = Object.keys(rawS[0]);
+        alert('STOCK rawS claves:\n' + k.map((x,i)=>i+': '+JSON.stringify(x)).join('\n') + '\n\nFila1: '+JSON.stringify(rawS[0]).slice(0,200));
+      } else {
+        alert('rawS VACÍO - SheetJS no leyó nada de STOCK');
+      }
+
       const normS = normalizeStock(rawS);
+      alert('normS.length = ' + normS.length + (normS.length>0 ? '\nFila1: '+JSON.stringify(normS[0]).slice(0,200) : '\nVACÍO - normalizeStock filtró todo'));
 
       setProgress(45, 'Borrando datos anteriores…');
       await sbDelete('excel_data');
