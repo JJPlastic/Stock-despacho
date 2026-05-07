@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control Stock & Despachos — JJPlastic</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#07090f;--s1:#0e1117;--s2:#141820;--s3:#1a1f2b;
+  --brd:#1e2535;--acc:#3b82f6;--grn:#22c55e;--ylw:#f59e0b;--red:#ef4444;--pur:#a855f7;
+  --txt:#dde4f0;--lt:#8b97b0;--mut:#4a5568;
+  --font:'DM Sans',sans-serif;--head:'Bebas Neue',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);background:var(--bg);color:var(--txt);min-height:100vh}
+
+/* LOADER */
+#loader{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+.spin{width:44px;height:44px;border:3px solid var(--brd);border-top-color:var(--acc);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loader p{color:var(--lt);font-size:14px}
+
+/* HEADER */
+header{background:var(--s1);border-bottom:1px solid var(--brd);padding:0 28px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0;z-index:100;gap:8px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--acc),#6366f1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.brand h1{font-family:var(--head);font-size:22px;letter-spacing:1px;color:#fff}
+.nav{display:flex;gap:4px;flex-wrap:wrap}
+.nav button{padding:7px 16px;border-radius:7px;border:1px solid transparent;background:transparent;color:var(--lt);cursor:pointer;font-family:var(--font);font-size:13px;font-weight:500;transition:all .18s}
+.nav button.on{background:var(--acc);color:#fff}
+.nav button:hover:not(.on){background:var(--s3);color:var(--txt)}
+.hdr-right{display:flex;align-items:center;gap:8px}
+.sync-badge{font-size:11px;color:var(--mut);display:flex;align-items:center;gap:6px}
+.dot-live{width:7px;height:7px;border-radius:50%;background:var(--grn);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.btn-sm{background:var(--s3);border:1px solid var(--brd);color:var(--lt);padding:5px 12px;border-radius:7px;cursor:pointer;font-family:var(--font);font-size:12px;transition:all .18s}
+.btn-sm:hover{border-color:var(--acc);color:var(--acc)}
+.btn-upload{background:var(--acc);border:none;color:#fff;padding:6px 14px;border-radius:7px;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:600;transition:all .18s;display:none}
+.btn-upload:hover{background:#2563eb}
+.admin-badge{background:#052e16;color:#4ade80;font-size:10px;padding:3px 8px;border-radius:5px;font-weight:700}
+
+/* UPLOAD MODAL */
+#upload-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:8000;align-items:center;justify-content:center}
+#upload-modal.on{display:flex}
+.modal-box{background:var(--s1);border:1px solid var(--brd);border-radius:16px;padding:36px;width:90%;max-width:480px;text-align:center}
+.modal-title{font-family:var(--head);font-size:26px;color:#fff;margin-bottom:8px}
+.modal-sub{font-size:13px;color:var(--mut);margin-bottom:24px;line-height:1.6}
+.drop-zone{border:2px dashed var(--brd);border-radius:12px;padding:36px 24px;cursor:pointer;transition:all .2s;margin-bottom:16px}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--acc);background:rgba(59,130,246,.06)}
+.drop-icon{font-size:36px;margin-bottom:8px}
+.drop-txt{font-size:13px;color:var(--lt)}
+.upload-progress{display:none;margin-top:16px}
+.progress-bar{height:6px;background:var(--s3);border-radius:3px;overflow:hidden;margin-top:8px}
+.progress-fill{height:100%;background:var(--acc);border-radius:3px;transition:width .3s}
+.progress-txt{font-size:12px;color:var(--lt);margin-bottom:4px}
+.modal-close{background:transparent;border:1px solid var(--brd);color:var(--lt);padding:7px 20px;border-radius:7px;cursor:pointer;font-family:var(--font);font-size:13px;margin-top:12px}
+.modal-close:hover{border-color:var(--red);color:var(--red)}
+
+/* LOGIN MODAL */
+#login-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:8000;align-items:center;justify-content:center}
+#login-modal.on{display:flex}
+.login-box{background:var(--s1);border:1px solid var(--brd);border-radius:16px;padding:36px;width:90%;max-width:360px;text-align:center}
+.login-title{font-family:var(--head);font-size:26px;color:#fff;margin-bottom:6px}
+.login-sub{font-size:13px;color:var(--mut);margin-bottom:24px}
+.login-input{width:100%;background:var(--s2);border:1px solid var(--brd);color:var(--txt);font-family:var(--font);padding:10px 14px;border-radius:8px;font-size:14px;outline:none;margin-bottom:12px;transition:border .18s}
+.login-input:focus{border-color:var(--acc)}
+.login-btn{width:100%;background:var(--acc);border:none;color:#fff;padding:10px;border-radius:8px;cursor:pointer;font-family:var(--font);font-size:14px;font-weight:600;transition:all .18s}
+.login-btn:hover{background:#2563eb}
+.login-err{font-size:12px;color:var(--red);margin-top:8px;display:none}
+
+/* PAGES */
+.pg{display:none;padding:24px 28px;max-width:1520px;margin:0 auto;animation:fadeIn .25s ease}
+.pg.on{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* NO DATA */
+#no-data{display:none;padding:80px 28px;text-align:center}
+#no-data .nd-icon{font-size:56px;margin-bottom:16px}
+#no-data .nd-title{font-family:var(--head);font-size:28px;color:var(--lt);margin-bottom:8px}
+#no-data .nd-sub{font-size:14px;color:var(--mut)}
+
+/* KPIS */
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:22px}
+.kpi{background:var(--s1);border:1px solid var(--brd);border-radius:12px;padding:18px 20px;position:relative;overflow:hidden}
+.kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kc,var(--acc))}
+.kpi-lbl{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--mut);margin-bottom:6px}
+.kpi-val{font-family:var(--head);font-size:34px;letter-spacing:1px;color:var(--kc,var(--txt));line-height:1}
+.kpi-sub{font-size:11px;color:var(--mut);margin-top:5px}
+
+/* GRID */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+.g3{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:18px;margin-bottom:18px}
+.card{background:var(--s1);border:1px solid var(--brd);border-radius:12px;padding:20px}
+.ctitle{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--lt);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.ctitle::before{content:'';width:3px;height:14px;border-radius:2px;background:var(--acc);flex-shrink:0}
+
+/* CHARTS */
+.bars{display:flex;flex-direction:column;gap:9px}
+.bar-row{display:flex;align-items:center;gap:10px}
+.bar-lbl{font-size:12px;color:var(--lt);width:220px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{flex:1;height:8px;background:var(--s3);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px}
+.bar-num{font-size:12px;color:var(--mut);width:44px;text-align:right;flex-shrink:0}
+.mchart{display:flex;align-items:flex-end;gap:8px;height:110px}
+.mcol{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
+.mbar-wrap{flex:1;display:flex;align-items:flex-end;width:100%}
+.mbar{width:100%;border-radius:3px 3px 0 0;min-height:3px;background:var(--acc)}
+.mlbl{font-size:10px;color:var(--mut)}
+.mval{font-size:10px;color:var(--lt)}
+.donut-row{display:flex;align-items:center;gap:20px}
+.dlegend{display:flex;flex-direction:column;gap:7px;flex:1}
+.dleg-item{display:flex;align-items:center;gap:8px;font-size:12px}
+.dleg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.dleg-name{flex:1;color:var(--lt)}
+.dleg-val{color:var(--mut)}
+.alerts{display:flex;flex-direction:column;gap:8px}
+.alert-item{background:var(--s2);border-left:3px solid var(--red);border-radius:0 8px 8px 0;padding:10px 14px;display:flex;justify-content:space-between;align-items:center}
+.alert-name{font-size:13px;font-weight:500}
+.alert-det{font-size:11px;color:var(--mut);margin-top:2px}
+.alert-val{font-family:var(--head);font-size:22px;color:var(--red)}
+
+/* FILTERS & TABLE */
+.filters{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.filters input,.filters select{background:var(--s2);border:1px solid var(--brd);color:var(--txt);font-family:var(--font);padding:8px 13px;border-radius:8px;font-size:13px;outline:none;transition:border .18s}
+.filters input{flex:1;min-width:180px}
+.filters input:focus,.filters select:focus{border-color:var(--acc)}
+.filters select option{background:#1a1f2b}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{text-align:left;padding:9px 11px;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--mut);border-bottom:1px solid var(--brd);cursor:pointer;user-select:none;white-space:nowrap}
+thead th:hover{color:var(--txt)}
+tbody tr{border-bottom:1px solid #131720;transition:background .12s}
+tbody tr:hover{background:var(--s2)}
+tbody td{padding:9px 11px;color:var(--lt)}
+tbody td.bold{color:var(--txt);font-weight:500}
+tbody td.right{text-align:right}
+.bd{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.bd-grn{background:#052e16;color:#4ade80}
+.bd-ylw{background:#451a03;color:#fbbf24}
+.bd-red{background:#3b0a0a;color:#f87171}
+.bd-blu{background:#0c1f4a;color:#60a5fa}
+.bd-pur{background:#1e1b4b;color:#c4b5fd}
+.bd-gry{background:#1e293b;color:#64748b}
+.pgn{display:flex;align-items:center;gap:6px;margin-top:12px;justify-content:flex-end}
+.pgn button{background:var(--s2);border:1px solid var(--brd);color:var(--lt);padding:5px 11px;border-radius:6px;cursor:pointer;font-size:12px;font-family:var(--font);transition:all .15s}
+.pgn button:hover,.pgn button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.pgn button:disabled{opacity:.3;cursor:default}
+.pgn-info{font-size:11px;color:var(--mut);margin-top:6px;text-align:right}
+.sbar{display:flex;align-items:center;gap:6px}
+.sbar-track{flex:1;height:5px;background:var(--s3);border-radius:3px}
+.sbar-fill{height:100%;border-radius:3px}
+.sbar-pct{font-size:10px;color:var(--mut);width:30px;text-align:right}
+
+@media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.g3{grid-template-columns:1fr 1fr}}
+@media(max-width:780px){.kpis{grid-template-columns:1fr 1fr}.g2,.g3{grid-template-columns:1fr}header{height:auto;padding:10px 14px}.pg{padding:14px}}
+@media(max-width:480px){.kpis{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div id="loader"><div class="spin"></div><p id="loader-msg">Cargando datos…</p></div>
+
+<!-- LOGIN MODAL -->
+<div id="login-modal">
+  <div class="login-box">
+    <div class="login-title">ACCESO ADMIN</div>
+    <div class="login-sub">Ingresa la contraseña para subir datos</div>
+    <input type="password" class="login-input" id="pwd-input" placeholder="Contraseña" onkeydown="if(event.key==='Enter')checkPwd()">
+    <button class="login-btn" onclick="checkPwd()">Ingresar</button>
+    <div class="login-err" id="pwd-err">Contraseña incorrecta</div>
+    <br>
+    <button class="modal-close" onclick="closeLogin()">Cancelar</button>
+  </div>
+</div>
+
+<!-- UPLOAD MODAL -->
+<div id="upload-modal">
+  <div class="modal-box">
+    <div class="modal-title">ACTUALIZAR DATOS</div>
+    <div class="modal-sub">Sube el archivo Excel actualizado.<br>Los datos anteriores serán reemplazados para todos los usuarios.</div>
+    <div class="drop-zone" id="drop-zone"
+         onclick="document.getElementById('file-input').click()"
+         ondragover="dzEv(event,'drag')" ondragleave="dzEv(event,'')" ondrop="dzDrop(event)">
+      <div class="drop-icon">📊</div>
+      <div class="drop-txt">Arrastra <b>Stock-despacho.xlsx</b> aquí<br>o haz clic para seleccionar</div>
+    </div>
+    <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none" onchange="onFile(this.files[0])">
+    <div class="upload-progress" id="upload-progress">
+      <div class="progress-txt" id="progress-txt">Procesando…</div>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+    </div>
+    <button class="modal-close" onclick="closeUpload()">Cancelar</button>
+  </div>
+</div>
+
+<header>
+  <div class="brand">
+    <div class="brand-icon">📦</div>
+    <h1>STOCK & DESPACHOS</h1>
+  </div>
+  <div class="nav">
+    <button class="on" onclick="goPage('resumen',this)">📊 Resumen</button>
+    <button onclick="goPage('despachos',this)">🚚 Despachos</button>
+    <button onclick="goPage('stock',this)">🏭 Stock</button>
+    <button onclick="goPage('clientes',this)">👥 Clientes</button>
+  </div>
+  <div class="hdr-right">
+    <div class="sync-badge">
+      <div class="dot-live"></div>
+      <span id="last-sync">—</span>
+    </div>
+    <span class="admin-badge" id="admin-badge" style="display:none">ADMIN</span>
+    <button class="btn-upload" id="btn-upload" onclick="openUpload()">⬆ Subir Excel</button>
+    <button class="btn-sm" id="btn-admin" onclick="openLogin()">🔐 Admin</button>
+    <button class="btn-sm" onclick="loadData()">↻ Actualizar</button>
+  </div>
+</header>
+
+<!-- NO DATA -->
+<div id="no-data">
+  <div class="nd-icon">📭</div>
+  <div class="nd-title">Sin datos cargados</div>
+  <div class="nd-sub">El administrador debe subir el archivo Excel para que los datos estén disponibles.</div>
+</div>
+
+<!-- RESUMEN -->
+<div class="pg on" id="pg-resumen">
+  <div class="kpis">
+    <div class="kpi" style="--kc:var(--acc)"><div class="kpi-lbl">Total Órdenes</div><div class="kpi-val" id="k-total">—</div><div class="kpi-sub">registros DESPACHO</div></div>
+    <div class="kpi" style="--kc:var(--grn)"><div class="kpi-lbl">Despachados</div><div class="kpi-val" id="k-desp">—</div><div class="kpi-sub" id="k-desp-s">—</div></div>
+    <div class="kpi" style="--kc:var(--ylw)"><div class="kpi-lbl">Pendientes</div><div class="kpi-val" id="k-pend">—</div><div class="kpi-sub">sin despachar</div></div>
+    <div class="kpi" style="--kc:var(--pur)"><div class="kpi-lbl">OTIF</div><div class="kpi-val" id="k-otif">—</div><div class="kpi-sub">pedidos a tiempo</div></div>
+    <div class="kpi" style="--kc:var(--red)"><div class="kpi-lbl">Stock Crítico</div><div class="kpi-val" id="k-crit">—</div><div class="kpi-sub">productos a producir</div></div>
+  </div>
+  <div class="g3">
+    <div class="card"><div class="ctitle">Volumen Mensual (DOC)</div><div class="mchart" id="mchart"></div></div>
+    <div class="card"><div class="ctitle">Distribución por Rango</div><div class="donut-row" id="donut"></div></div>
+    <div class="card">
+      <div class="ctitle">JJP vs PTK</div>
+      <div id="op-bars" class="bars" style="margin-bottom:16px"></div>
+      <div style="display:flex;gap:24px;justify-content:center">
+        <div style="text-align:center"><div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--mut)">JJP</div><div style="font-family:var(--head);font-size:26px;color:#6366f1" id="jjp-n">—</div></div>
+        <div style="text-align:center"><div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--mut)">PTK</div><div style="font-family:var(--head);font-size:26px;color:var(--grn)" id="ptk-n">—</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="g2">
+    <div class="card"><div class="ctitle">Top 10 Productos más Despachados</div><div class="bars" id="top-prods"></div></div>
+    <div class="card"><div class="ctitle">⚠ Alertas de Stock — Déficit</div><div class="alerts" id="alerts"></div></div>
+  </div>
+</div>
+
+<!-- DESPACHOS -->
+<div class="pg" id="pg-despachos">
+  <div class="card">
+    <div class="ctitle">Registro de Despachos</div>
+    <div class="filters">
+      <input type="text" id="d-q" placeholder="🔍  OP, producto, cliente, código…" oninput="dFilter()">
+      <select id="d-est" onchange="dFilter()"><option value="">Todos los estados</option><option value="DESPACHADO">Despachado</option><option value="PENDIENTE">Pendiente</option></select>
+      <select id="d-op" onchange="dFilter()"><option value="">JJP + PTK</option><option value="JJP">JJP</option><option value="PTK">PTK</option></select>
+      <select id="d-rng" onchange="dFilter()"><option value="">Todos los rangos</option><option value="PLATINO">Platino</option><option value="ORO">Oro</option><option value="PLATA">Plata</option><option value="BRONCE">Bronce</option><option value="SIN RANGO">Sin Rango</option></select>
+      <select id="d-mes" onchange="dFilter()"><option value="">Todos los meses</option></select>
+      <select id="d-fp" onchange="dFilter()"><option value="">Forma de pago</option><option value="CREDITO">Crédito</option><option value="CONTADO">Contado</option><option value="ADELANTO">Adelanto</option></select>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr>
+        <th onclick="dSort('op')">OP ↕</th><th onclick="dSort('tipo')">Tipo ↕</th>
+        <th onclick="dSort('forma_pago')">F. Pago ↕</th><th onclick="dSort('fecha_despacho')">F. Despacho ↕</th>
+        <th onclick="dSort('fecha_compromiso')">F. Compromiso ↕</th><th onclick="dSort('cod')">Código ↕</th>
+        <th onclick="dSort('producto')">Producto ↕</th><th onclick="dSort('cliente')">Cliente ↕</th>
+        <th onclick="dSort('cantidad')" style="text-align:right">Cant. ↕</th>
+        <th onclick="dSort('rango')">Rango ↕</th><th onclick="dSort('estado')">Estado ↕</th><th onclick="dSort('cumple')">OTIF ↕</th>
+      </tr></thead>
+      <tbody id="d-body"></tbody>
+    </table></div>
+    <div class="pgn" id="d-pgn"></div><div class="pgn-info" id="d-info"></div>
+  </div>
+</div>
+
+<!-- STOCK -->
+<div class="pg" id="pg-stock">
+  <div class="kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px">
+    <div class="kpi" style="--kc:var(--acc)"><div class="kpi-lbl">Total Productos</div><div class="kpi-val" id="s-tot">—</div><div class="kpi-sub">en inventario</div></div>
+    <div class="kpi" style="--kc:var(--grn)"><div class="kpi-lbl">Stock OK</div><div class="kpi-val" id="s-ok">—</div><div class="kpi-sub">sin producción urgente</div></div>
+    <div class="kpi" style="--kc:var(--red)"><div class="kpi-lbl">A Producir</div><div class="kpi-val" id="s-prod">—</div><div class="kpi-sub">stock insuficiente</div></div>
+    <div class="kpi" style="--kc:var(--ylw)"><div class="kpi-lbl">Total Stock DOC</div><div class="kpi-val" id="s-tdoc">—</div><div class="kpi-sub">docenas disponibles</div></div>
+  </div>
+  <div class="card">
+    <div class="ctitle">Inventario de Productos</div>
+    <div class="filters">
+      <input type="text" id="s-q" placeholder="🔍  Buscar producto…" oninput="sFilter()">
+      <select id="s-pr" onchange="sFilter()"><option value="">Todos</option><option value="SI">🔴 A Producir</option><option value="NO">✅ Stock OK</option></select>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr>
+        <th onclick="sSort('producto')">Producto ↕</th><th onclick="sSort('color')">Color ↕</th>
+        <th onclick="sSort('presentacion')" style="text-align:right">Pres. ↕</th>
+        <th onclick="sSort('stock_doc')" style="text-align:right">Stock DOC ↕</th>
+        <th onclick="sSort('stock_paq')" style="text-align:right">Stock PAQ ↕</th>
+        <th onclick="sSort('solicitado_doc')" style="text-align:right">Solicitado DOC ↕</th>
+        <th>Cobertura</th>
+        <th onclick="sSort('stock_restante_doc')" style="text-align:right">Restante DOC ↕</th>
+        <th onclick="sSort('producir')">Estado ↕</th>
+      </tr></thead>
+      <tbody id="s-body"></tbody>
+    </table></div>
+    <div class="pgn" id="s-pgn"></div><div class="pgn-info" id="s-info"></div>
+  </div>
+</div>
+
+<!-- CLIENTES -->
+<div class="pg" id="pg-clientes">
+  <div class="card">
+    <div class="ctitle">Clientes — Historial de Despachos</div>
+    <div class="filters">
+      <input type="text" id="c-q" placeholder="🔍  Buscar cliente…" oninput="cFilter()">
+      <select id="c-rng" onchange="cFilter()"><option value="">Todos los rangos</option><option value="PLATINO">Platino</option><option value="ORO">Oro</option><option value="PLATA">Plata</option><option value="BRONCE">Bronce</option><option value="SIN RANGO">Sin Rango</option></select>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr>
+        <th onclick="cSort('cliente')">Cliente ↕</th><th onclick="cSort('rango')">Rango ↕</th>
+        <th onclick="cSort('ordenes')" style="text-align:right">Órdenes ↕</th>
+        <th onclick="cSort('total_doc')" style="text-align:right">Total DOC ↕</th>
+        <th onclick="cSort('otif_pct')" style="text-align:right">OTIF % ↕</th>
+        <th onclick="cSort('ultimo')">Último Despacho ↕</th>
+        <th onclick="cSort('pendientes')" style="text-align:right">Pendientes ↕</th>
+      </tr></thead>
+      <tbody id="c-body"></tbody>
+    </table></div>
+    <div class="pgn" id="c-pgn"></div><div class="pgn-info" id="c-info"></div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// CONFIGURACIÓN SUPABASE
+// ══════════════════════════════════════════════
+const SB_URL = 'https://feqveonxrptqqxowjaii.supabase.co';
+const SB_KEY = 'sb_publishable_X-OhYkPpa4XRjex2uQmfpQ_nTz2IG1D';
+const ADMIN_PWD = 'JJPlastic2024'; // ← cambia esta contraseña
+
+// ══════════════════════════════════════════════
+// ESTADO
+// ══════════════════════════════════════════════
+let DESPACHO=[], STOCK=[];
+let dData=[], sData=[], cAll=[];
+let dPage=1, sPage=1, cPage=1;
+const PER=20;
+let dSK='fecha_despacho',dSD=-1, sSK='producir',sSD=-1, cSK='total_doc',cSD=-1;
+let isAdmin=false;
+
+// ══════════════════════════════════════════════
+// SUPABASE API
+// ══════════════════════════════════════════════
+const sbHeaders = {
+  'apikey': SB_KEY,
+  'Authorization': `Bearer ${SB_KEY}`,
+  'Content-Type': 'application/json',
+  'Prefer': 'return=minimal'
+};
+
+async function sbGet(table, params='') {
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?${params}`, {headers: sbHeaders});
+  if (!r.ok) throw new Error(`Error ${r.status}: ${await r.text()}`);
+  return r.json();
+}
+
+async function sbDelete(table) {
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?id=gte.0`, {
+    method: 'DELETE', headers: sbHeaders
+  });
+  if (!r.ok) throw new Error(`Error al borrar: ${await r.text()}`);
+}
+
+async function sbInsertBatch(table, rows) {
+  // Insertar en lotes de 500
+  for (let i=0; i<rows.length; i+=500) {
+    const batch = rows.slice(i, i+500);
+    const r = await fetch(`${SB_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: {...sbHeaders, 'Prefer': 'return=minimal'},
+      body: JSON.stringify(batch)
+    });
+    if (!r.ok) throw new Error(`Error insertando: ${await r.text()}`);
+    const pct = Math.min(100, Math.round((i+500)/rows.length*100));
+    setProgress(pct, `Guardando datos… ${pct}%`);
+  }
+}
+
+// ══════════════════════════════════════════════
+// CARGAR DATOS DESDE SUPABASE
+// ══════════════════════════════════════════════
+async function loadData() {
+  $('loader').style.display = 'flex';
+  $('loader-msg').textContent = 'Cargando datos desde la nube…';
+  try {
+    const rows = await sbGet('excel_data', 'order=id.asc');
+    if (!rows.length) {
+      $('loader').style.display = 'none';
+      showNoData(true);
+      $('last-sync').textContent = 'Sin datos';
+      return;
+    }
+    showNoData(false);
+
+    // Separar hojas
+    DESPACHO = rows.filter(r=>r.sheet_name==='DESPACHO').map(r=>r.data);
+    STOCK    = rows.filter(r=>r.sheet_name==='STOCK').map(r=>r.data);
+
+    const uploaded = rows[0]?.uploaded_at;
+    const dt = uploaded ? new Date(uploaded).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+    $('last-sync').textContent = `Actualizado ${dt}`;
+
+    buildResumen(); buildMeses();
+    dData=[...DESPACHO]; dPage=1; renderD();
+    sData=[...STOCK];    sPage=1; renderS();
+    buildClientes();
+
+  } catch(e) {
+    $('last-sync').textContent = 'Error de conexión';
+    alert('Error al cargar: ' + e.message);
+  } finally {
+    $('loader').style.display = 'none';
+  }
+}
+
+// Auto-refresh cada 5 min
+setInterval(loadData, 5*60*1000);
+
+// ══════════════════════════════════════════════
+// LEER EXCEL Y SUBIR A SUPABASE
+// ══════════════════════════════════════════════
+function dzEv(e,cls){e.preventDefault();$('drop-zone').className='drop-zone'+(cls?' '+cls:'');}
+function dzDrop(e){e.preventDefault();$('drop-zone').className='drop-zone';onFile(e.dataTransfer.files[0]);}
+
+function onFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    try {
+      $('upload-progress').style.display = 'block';
+      setProgress(5, 'Leyendo archivo Excel…');
+
+      const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+      const findSheet = name => wb.SheetNames.find(s=>s.trim().toUpperCase()===name.toUpperCase());
+      const sheetD = findSheet('DESPACHO'), sheetS = findSheet('STOCK');
+      if (!sheetD) { alert('No se encontró la hoja DESPACHO.'); return; }
+      if (!sheetS) { alert('No se encontró la hoja STOCK.'); return; }
+
+      setProgress(15, 'Procesando DESPACHO…');
+      const rawD = XLSX.utils.sheet_to_json(wb.Sheets[sheetD], {defval:''});
+      const normD = normalizeDespacho(rawD);
+
+      setProgress(30, 'Procesando STOCK…');
+      const rawS = XLSX.utils.sheet_to_json(wb.Sheets[sheetS], {defval:''});
+      const normS = normalizeStock(rawS);
+
+      setProgress(45, 'Borrando datos anteriores…');
+      await sbDelete('excel_data');
+
+      setProgress(50, 'Subiendo DESPACHO…');
+      const rowsD = normD.map(d=>({sheet_name:'DESPACHO', data:d}));
+      await sbInsertBatch('excel_data', rowsD);
+
+      setProgress(80, 'Subiendo STOCK…');
+      const rowsS = normS.map(s=>({sheet_name:'STOCK', data:s}));
+      await sbInsertBatch('excel_data', rowsS);
+
+      setProgress(100, '✅ ¡Datos actualizados para todos!');
+      setTimeout(()=>{ closeUpload(); loadData(); }, 1500);
+
+    } catch(err) {
+      alert('Error al procesar: ' + err.message);
+      $('upload-progress').style.display = 'none';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function setProgress(pct, txt) {
+  $('progress-fill').style.width = pct + '%';
+  $('progress-txt').textContent = txt;
+}
+
+// ══════════════════════════════════════════════
+// ADMIN LOGIN
+// ══════════════════════════════════════════════
+function openLogin(){ $('login-modal').classList.add('on'); $('pwd-input').value=''; $('pwd-err').style.display='none'; setTimeout(()=>$('pwd-input').focus(),100); }
+function closeLogin(){ $('login-modal').classList.remove('on'); }
+function checkPwd(){
+  if($('pwd-input').value === ADMIN_PWD){
+    isAdmin=true; closeLogin();
+    $('btn-upload').style.display='block';
+    $('admin-badge').style.display='inline-block';
+    $('btn-admin').style.display='none';
+  } else {
+    $('pwd-err').style.display='block';
+  }
+}
+function openUpload(){ $('upload-modal').classList.add('on'); $('upload-progress').style.display='none'; }
+function closeUpload(){ $('upload-modal').classList.remove('on'); }
+
+// ══════════════════════════════════════════════
+// NORMALIZAR DATOS
+// ══════════════════════════════════════════════
+function normalizeDespacho(rows){
+  return rows.filter(r=>{const op=cl(r['OP-N°']??r['OP-N']??'');return op&&op!=='OP-N°';})
+  .map(r=>({
+    op:cl(r['OP-N°']??r['OP-N']), tipo:cl(r['OP']),
+    forma_pago:cl(r['FORMA.PAGO']??r['FORMA DE PAGO']),
+    fecha_pedido:fmtDate(r['F. PEDIDO']), fecha_compromiso:fmtDate(r['F. COMPROMISO']),
+    fecha_despacho:fmtDate(r['F. DESPACHO']), cantidad:num(r['Q']),
+    cod:cl(r['COD']), producto:cl(r['PRODUCTOS NO INDUSTRIALES']),
+    cliente:cl(r['CLIENTE']), rango:cl(r['RANGO']),
+    estado:cl(r['ESTADO']), cumple:num(r['¿CUMPLE?']),
+  })).filter(r=>r.op&&r.producto);
+}
+function normalizeStock(rows){
+  return rows.filter(r=>{const p=cl(r['DESCRIPCIÓN DEL PRODUCTO']??'');return p&&p!=='DESCRIPCIÓN DEL PRODUCTO';})
+  .map(r=>({
+    producto:cl(r['DESCRIPCIÓN DEL PRODUCTO']), color:cl(r['COLOR']),
+    presentacion:num(r['PRESENTACIÓN']), stock_paq:num(r['STOCK (PAQ)']),
+    stock_doc:num(r['STOCK (DOC)']), solicitado_doc:num(r['SOLICITADO (DOC)']),
+    solicitado_paq:num(r['SOLICITADO (PAQ)']), producir:cl(r['¿PRODUCIR?']),
+    stock_restante_doc:num(r['STOCK RESTANTE (DOC)']),
+    stock_restante_paq:num(r['STOCK  (PAQ)']??r['STOCK (PAQ).1']),
+  }));
+}
+function cl(v){return String(v??'').trim();}
+function num(v){const x=parseFloat(String(v??'').replace(/,/g,'.'));return isNaN(x)?0:x;}
+function fmtDate(v){
+  if(!v)return'';
+  if(v instanceof Date)return v.toISOString().slice(0,10);
+  const s=String(v).trim();
+  if(!s||s==='null')return'';
+  if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);
+  const df=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if(df)return`${df[3]}-${df[2].padStart(2,'0')}-${df[1].padStart(2,'0')}`;
+  const d=new Date(s);return isNaN(d)?s.slice(0,10):d.toISOString().slice(0,10);
+}
+
+// ══════════════════════════════════════════════
+// RESUMEN
+// ══════════════════════════════════════════════
+function buildResumen(){
+  const tot=DESPACHO.length, desp=DESPACHO.filter(d=>d.estado==='DESPACHADO').length;
+  const pend=DESPACHO.filter(d=>d.estado==='PENDIENTE').length;
+  const otif=DESPACHO.filter(d=>d.cumple===1&&d.estado==='DESPACHADO').length;
+  const crit=STOCK.filter(s=>s.producir==='SI').length;
+  html('k-total',n(tot)); html('k-desp',n(desp)); html('k-desp-s',`${pct(desp,tot)} del total`);
+  html('k-pend',n(pend)); html('k-otif',pct(otif,desp)); html('k-crit',String(crit));
+
+  const mo={};
+  DESPACHO.forEach(d=>{const m=(d.fecha_despacho||d.fecha_pedido||'').slice(0,7);if(m)mo[m]=(mo[m]||0)+d.cantidad;});
+  const months=Object.keys(mo).sort(), maxM=Math.max(...Object.values(mo),1);
+  const ML={'01':'Ene','02':'Feb','03':'Mar','04':'Abr','05':'May','06':'Jun','07':'Jul','08':'Ago','09':'Sep','10':'Oct','11':'Nov','12':'Dic'};
+  html('mchart',months.map(m=>{const h=(mo[m]/maxM*100).toFixed(1),v=mo[m]>=1000?(mo[m]/1000).toFixed(1)+'k':n(mo[m]);
+    return`<div class="mcol"><div class="mval">${v}</div><div class="mbar-wrap"><div class="mbar" style="height:${h}%"></div></div><div class="mlbl">${ML[m.slice(5)]||m.slice(5)}</div></div>`;}).join(''));
+
+  const RC={PLATINO:'#a855f7',ORO:'#f59e0b',PLATA:'#94a3b8',BRONCE:'#d97706','SIN RANGO':'#475569'};
+  const rng={};
+  DESPACHO.filter(d=>d.estado==='DESPACHADO').forEach(d=>{const r=d.rango||'SIN RANGO';rng[r]=(rng[r]||0)+1;});
+  const totR=Object.values(rng).reduce((a,b)=>a+b,0);let ang=0;
+  const ent=Object.entries(rng).sort((a,b)=>b[1]-a[1]);
+  const paths=ent.map(([r,c])=>{const sw=c/totR*360,x1=50+40*Math.cos(ang*Math.PI/180),y1=50+40*Math.sin(ang*Math.PI/180);ang+=sw;const x2=50+40*Math.cos(ang*Math.PI/180),y2=50+40*Math.sin(ang*Math.PI/180);return`<path d="M50,50 L${x1.toFixed(1)},${y1.toFixed(1)} A40,40 0 ${sw>180?1:0},1 ${x2.toFixed(1)},${y2.toFixed(1)} Z" fill="${RC[r]||'#475569'}" opacity=".85"/>`;}).join('');
+  html('donut',`<svg width="100" height="100" viewBox="0 0 100 100">${paths}<circle cx="50" cy="50" r="22" fill="var(--s1)"/><text x="50" y="54" text-anchor="middle" fill="var(--txt)" font-size="11" font-weight="700">${n(totR)}</text></svg><div class="dlegend">${ent.map(([r,c])=>`<div class="dleg-item"><div class="dleg-dot" style="background:${RC[r]||'#475569'}"></div><span class="dleg-name">${r}</span><span class="dleg-val">${n(c)}</span></div>`).join('')}</div>`);
+
+  const pc={};DESPACHO.forEach(d=>{if(d.producto)pc[d.producto]=(pc[d.producto]||0)+1;});
+  const top=Object.entries(pc).sort((a,b)=>b[1]-a[1]).slice(0,10),maxP=top[0]?.[1]||1;
+  html('top-prods',top.map(([p,c])=>`<div class="bar-row"><div class="bar-lbl" title="${p}">${p}</div><div class="bar-track"><div class="bar-fill" style="width:${(c/maxP*100).toFixed(1)}%;background:var(--acc)"></div></div><div class="bar-num">${c}</div></div>`).join(''));
+
+  const neg=STOCK.filter(s=>s.producir==='SI').sort((a,b)=>a.stock_restante_doc-b.stock_restante_doc);
+  html('alerts',neg.length?neg.map(s=>`<div class="alert-item"><div><div class="alert-name">${s.producto}</div><div class="alert-det">Stock: ${n(s.stock_doc)} DOC · Solicitado: ${n(s.solicitado_doc)} DOC</div></div><div class="alert-val">${n(s.stock_restante_doc)}</div></div>`).join(''):'<div style="color:var(--grn);font-size:13px">✅ Sin alertas de stock crítico</div>');
+
+  const jjp=DESPACHO.filter(d=>d.tipo==='JJP').length,ptk=DESPACHO.filter(d=>d.tipo==='PTK').length,maxOp=Math.max(jjp,ptk,1);
+  html('jjp-n',n(jjp));html('ptk-n',n(ptk));
+  html('op-bars',[['JJP',jjp,'#6366f1'],['PTK',ptk,'var(--grn)']].map(([l,v,c])=>`<div class="bar-row"><div class="bar-lbl">${l}</div><div class="bar-track"><div class="bar-fill" style="width:${(v/maxOp*100).toFixed(1)}%;background:${c}"></div></div><div class="bar-num">${v}</div></div>`).join(''));
+}
+
+function buildMeses(){
+  const meses=[...new Set(DESPACHO.map(d=>(d.fecha_despacho||d.fecha_pedido||'').slice(0,7)).filter(Boolean))].sort().reverse();
+  const sel=$('d-mes');sel.innerHTML='<option value="">Todos los meses</option>';
+  const ML={'01':'Ene','02':'Feb','03':'Mar','04':'Abr','05':'May','06':'Jun','07':'Jul','08':'Ago','09':'Sep','10':'Oct','11':'Nov','12':'Dic'};
+  meses.forEach(m=>{const[y,mm]=m.split('-');sel.innerHTML+=`<option value="${m}">${ML[mm]||mm} ${y}</option>`;});
+}
+
+// ══════════════════════════════════════════════
+// DESPACHOS
+// ══════════════════════════════════════════════
+function dFilter(){
+  const q=$('d-q').value.toLowerCase(),est=$('d-est').value,op=$('d-op').value,rng=$('d-rng').value,mes=$('d-mes').value,fp=$('d-fp').value;
+  dData=DESPACHO.filter(d=>{
+    if(q&&!`${d.op} ${d.producto} ${d.cliente} ${d.cod}`.toLowerCase().includes(q))return false;
+    if(est&&d.estado!==est)return false;if(op&&d.tipo!==op)return false;
+    if(rng&&d.rango!==rng)return false;if(fp&&d.forma_pago!==fp)return false;
+    if(mes&&(d.fecha_despacho||d.fecha_pedido||'').slice(0,7)!==mes)return false;
+    return true;
+  });dPage=1;renderD();
+}
+function dSort(k){if(dSK===k)dSD*=-1;else{dSK=k;dSD=1;}renderD();}
+function renderD(){
+  const s=sortArr(dData,dSK,dSD),tot=s.length,st=(dPage-1)*PER,pg=s.slice(st,st+PER);
+  html('d-body',pg.map(d=>`<tr><td class="bold">${d.op}</td><td><span class="bd ${d.tipo==='JJP'?'bd-blu':'bd-grn'}">${d.tipo}</span></td><td>${fpB(d.forma_pago)}</td><td>${d.fecha_despacho||'—'}</td><td>${d.fecha_compromiso||'—'}</td><td style="color:var(--mut);font-size:12px">${d.cod}</td><td title="${d.producto}">${trunc(d.producto,38)}</td><td title="${d.cliente}" style="font-size:12px">${trunc(d.cliente,32)}</td><td class="right bold">${n(d.cantidad)}</td><td>${rngB(d.rango)}</td><td>${estB(d.estado)}</td><td>${d.cumple===1?'<span class="bd bd-grn">✓ SÍ</span>':'<span class="bd bd-red">✗ NO</span>'}</td></tr>`).join(''));
+  html('d-info',`Mostrando ${st+1}–${Math.min(st+PER,tot)} de ${n(tot)} registros`);
+  pgn('d-pgn',Math.ceil(tot/PER),dPage,p=>{dPage=p;renderD();});
+}
+
+// ══════════════════════════════════════════════
+// STOCK
+// ══════════════════════════════════════════════
+function sFilter(){const q=$('s-q').value.toLowerCase(),pr=$('s-pr').value;sData=STOCK.filter(s=>{if(q&&!s.producto.toLowerCase().includes(q))return false;if(pr&&s.producir!==pr)return false;return true;});sPage=1;renderS();}
+function sSort(k){if(sSK===k)sSD*=-1;else{sSK=k;sSD=1;}renderS();}
+function renderS(){
+  html('s-tot',n(STOCK.length));html('s-ok',n(STOCK.filter(s=>s.producir==='NO').length));
+  html('s-prod',n(STOCK.filter(s=>s.producir==='SI').length));html('s-tdoc',n(STOCK.reduce((a,s)=>a+s.stock_doc,0)));
+  const s=sortArr(sData,sSK,sSD),tot=s.length,st=(sPage-1)*PER,pg=s.slice(st,st+PER);
+  html('s-body',pg.map(s=>{const p=s.solicitado_doc>0?Math.min(100,s.stock_doc/s.solicitado_doc*100):100;const bc=p>=100?'var(--grn)':p>=50?'var(--ylw)':'var(--red)';const rc=s.stock_restante_doc<0?'var(--red)':s.stock_restante_doc===0?'var(--mut)':'var(--grn)';
+    return`<tr><td class="bold">${s.producto}</td><td style="font-size:12px;color:var(--mut)">${s.color||'—'}</td><td class="right">${s.presentacion}</td><td class="right bold">${n(s.stock_doc)}</td><td class="right">${n(s.stock_paq)}</td><td class="right">${n(s.solicitado_doc)}</td><td><div class="sbar"><div class="sbar-track"><div class="sbar-fill" style="width:${p.toFixed(1)}%;background:${bc}"></div></div><div class="sbar-pct">${p.toFixed(0)}%</div></div></td><td class="right bold" style="color:${rc}">${n(s.stock_restante_doc)}</td><td>${s.producir==='SI'?'<span class="bd bd-red">🔴 Producir</span>':'<span class="bd bd-grn">✓ OK</span>'}</td></tr>`;}).join(''));
+  html('s-info',`Mostrando ${st+1}–${Math.min(st+PER,tot)} de ${tot} productos`);
+  pgn('s-pgn',Math.ceil(tot/PER),sPage,p=>{sPage=p;renderS();});
+}
+
+// ══════════════════════════════════════════════
+// CLIENTES
+// ══════════════════════════════════════════════
+function buildClientes(){
+  const map={};
+  DESPACHO.forEach(d=>{if(!d.cliente)return;if(!map[d.cliente])map[d.cliente]={cliente:d.cliente,rango:d.rango,ordenes:0,total_doc:0,otif_si:0,otif_tot:0,ultimo:'',pendientes:0};
+    const c=map[d.cliente];c.ordenes++;c.total_doc+=d.cantidad;
+    if(d.estado==='DESPACHADO'){c.otif_tot++;if(d.cumple===1)c.otif_si++;}
+    if(d.estado==='PENDIENTE')c.pendientes++;
+    if((d.fecha_despacho||'')>c.ultimo)c.ultimo=d.fecha_despacho||'';});
+  cAll=Object.values(map).map(c=>({...c,otif_pct:c.otif_tot?Math.round(c.otif_si/c.otif_tot*100):0}));
+  cPage=1;cFilter();
+}
+function cFilter(){const q=$('c-q').value.toLowerCase(),rng=$('c-rng').value;renderC(cAll.filter(c=>{if(q&&!c.cliente.toLowerCase().includes(q))return false;if(rng&&c.rango!==rng)return false;return true;}));}
+function cSort(k){if(cSK===k)cSD*=-1;else{cSK=k;cSD=1;}cFilter();}
+function renderC(data){
+  const s=sortArr(data,cSK,cSD),tot=s.length,st=(cPage-1)*PER,pg=s.slice(st,st+PER);
+  html('c-body',pg.map(c=>`<tr><td class="bold" title="${c.cliente}">${trunc(c.cliente,42)}</td><td>${rngB(c.rango)}</td><td class="right">${n(c.ordenes)}</td><td class="right bold">${n(c.total_doc)}</td><td class="right" style="color:${c.otif_pct>=80?'var(--grn)':c.otif_pct>=50?'var(--ylw)':'var(--red)'};font-weight:600">${c.otif_pct}%</td><td>${c.ultimo||'—'}</td><td class="right">${c.pendientes>0?`<span class="bd bd-ylw">${c.pendientes}</span>`:'<span style="color:var(--mut)">0</span>'}</td></tr>`).join(''));
+  html('c-info',`${n(tot)} clientes`);
+  pgn('c-pgn',Math.ceil(tot/PER),cPage,p=>{cPage=p;renderC(data);});
+}
+
+// ══════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════
+const $=id=>document.getElementById(id);
+const html=(id,v)=>{const el=$(id);if(el)el.innerHTML=v;};
+const n=v=>v==null?'—':Number(v).toLocaleString('es-PE');
+const pct=(a,b)=>b?`${(a/b*100).toFixed(1)}%`:'—';
+const trunc=(s,l)=>s&&s.length>l?s.slice(0,l)+'…':(s||'');
+const sortArr=(arr,k,d)=>[...arr].sort((a,b)=>{let av=a[k]??'',bv=b[k]??'';if(typeof av==='string'){av=av.toLowerCase();bv=bv.toLowerCase();}return av<bv?-d:av>bv?d:0;});
+const rngB=r=>{const m={PLATINO:'bd-pur',ORO:'bd-ylw',PLATA:'bd-blu',BRONCE:'bd-gry','SIN RANGO':'bd-gry'};return`<span class="bd ${m[r]||'bd-gry'}">${r||'—'}</span>`;};
+const estB=e=>e==='DESPACHADO'?'<span class="bd bd-grn">✓ Despachado</span>':'<span class="bd bd-ylw">⏳ Pendiente</span>';
+const fpB=f=>{const m={CREDITO:'bd-blu',CONTADO:'bd-grn',ADELANTO:'bd-pur'};return f?`<span class="bd ${m[f]||'bd-gry'}">${f}</span>`:'<span style="color:var(--mut)">—</span>';};
+function showNoData(show){$('no-data').style.display=show?'block':'none';document.querySelectorAll('.pg').forEach(p=>p.style.display=show?'none':'');}
+function pgn(id,pages,cur,cb){const el=$(id);if(pages<=1){el.innerHTML='';return;}const s=Math.max(1,cur-2),e=Math.min(pages,cur+2);let h=`<button onclick="(${cb})(${Math.max(1,cur-1)})" ${cur===1?'disabled':''}>‹</button>`;if(s>1)h+=`<button onclick="(${cb})(1)">1</button>${s>2?'<span style="color:var(--mut);padding:0 4px">…</span>':''}`;for(let i=s;i<=e;i++)h+=`<button class="${i===cur?'on':''}" onclick="(${cb})(${i})">${i}</button>`;if(e<pages)h+=`${e<pages-1?'<span style="color:var(--mut);padding:0 4px">…</span>':''}<button onclick="(${cb})(${pages})">${pages}</button>`;h+=`<button onclick="(${cb})(${Math.min(pages,cur+1)})" ${cur===pages?'disabled':''}>›</button>`;el.innerHTML=h;}
+function goPage(id,btn){document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('on'));$(('pg-'+id)).classList.add('on');btn.classList.add('on');}
+
+// ══════════════════════════════════════════════
+// INICIO
+// ══════════════════════════════════════════════
+loadData();
+</script>
+</body>
+</html>
