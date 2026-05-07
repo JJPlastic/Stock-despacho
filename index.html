@@ -532,35 +532,32 @@ function normalizeDespacho(rows){
 }
 function normalizeStock(rows){
   if(!rows||!rows.length) return [];
-  // Buscar clave flexible — ignora tildes, mayúsculas y espacios
-  function fk(obj, ...hints){
-    const keys = Object.keys(obj);
-    for(const hint of hints){
-      const h = hint.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
-      const found = keys.find(k=>{
-        const kn = k.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
-        return kn === h;
-      });
-      if(found !== undefined && obj[found] !== undefined) return obj[found];
-    }
-    return '';
+  function norm(s){
+    return String(s||'').toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g,'')
+      .replace(/[^a-z0-9]/g,'');
+  }
+  function fk(obj,hint){
+    const h=norm(hint);
+    const k=Object.keys(obj).find(k=>norm(k)===h);
+    return k!==undefined?obj[k]:'';
   }
   return rows
-    .filter(r => cl(fk(r,'DESCRIPCION DEL PRODUCTO','DESCRIPCIONDEL PRODUCTO','DESCRIPCION')).length > 1)
-    .map(r => ({
-      producto:           cl(fk(r,'DESCRIPCION DEL PRODUCTO','DESCRIPCION')),
+    .map(r=>({
+      producto:           cl(fk(r,'DESCRIPCIONDEL PRODUCTO')||fk(r,'DESCRIPCION DEL PRODUCTO')),
       color:              cl(fk(r,'COLOR')),
       presentacion:       num(fk(r,'PRESENTACION')),
-      stock_paq:          num(fk(r,'FISICO PAQ','STOCKPAQ')),
-      stock_doc:          num(fk(r,'FISICO DOC','STOCKDOC')),
+      stock_paq:          num(fk(r,'FISICO PAQ')),
+      stock_doc:          num(fk(r,'FISICO DOC')),
       solicitado_doc:     num(fk(r,'SOLICITADO DOC')),
       solicitado_paq:     num(fk(r,'SOLICITADO PAQ')),
       producir:           cl(fk(r,'PRODUCIR')),
-      stock_restante_doc: num(fk(r,'DISPONIBLE DOC','STOCKRESTANTE DOC')),
-      stock_restante_paq: num(fk(r,'DISPONIBLE PAQ','STOCKRESTANTE PAQ')),
+      stock_restante_doc: num(fk(r,'DISPONIBLE DOC')),
+      stock_restante_paq: num(fk(r,'DISPONIBLE PAQ')),
     }))
-    .filter(r => r.producto && r.producto.length > 1);
+    .filter(r=>r.producto&&r.producto.length>1);
 }
+
 function cl(v){return String(v??'').trim();}
 function num(v){const x=parseFloat(String(v??'').replace(/,/g,'.'));return isNaN(x)?0:x;}
 function fmtDate(v){
