@@ -236,7 +236,7 @@ function normD(rows){
       cliente:String(r['CLIENTE']||'').trim(),
       rango:String(r['RANGO']||'').trim(),
       estado:String(r['ESTADO']||'').trim(),
-      cumple:(fD&&fA&&fD<=fA)?1:0,
+      cumple:(String(r['ESTADO']||'').trim()==='DESPACHADO'&&fD&&fA&&fD<=fA)?1:0,
     };
   }).filter(r=>r.op&&r.producto&&r.producto.length>1);
 }
