@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -197,7 +196,7 @@ function readSheet(wb,name){
   const headers=[];
   for(let C=range.s.c;C<=range.e.c;C++){
     const cell=ws[XLSX.utils.encode_cell({r:range.s.r,c:C})];
-    headers.push(cell?String(cell.v||''):'');
+    headers.push(cell?String(cell.v||cell.w||''):'');
   }
   const rows=[];
   for(let R=range.s.r+1;R<=range.e.r;R++){
@@ -207,8 +206,23 @@ function readSheet(wb,name){
       const cell=ws[XLSX.utils.encode_cell({r:R,c:C})];
       let v='';
       if(cell){
-        if(cell.t==='d'){v=cell.w||'';}  // fecha: usar formato w
-        else if(cell.v!==undefined){v=cell.v;} // valor calculado
+        if(cell.t==='d'){
+          // Fecha: usar w (formateado) o reconstruir desde v (serial Excel)
+          if(cell.w){v=cell.w;}
+          else if(typeof cell.v==='number'){
+            const d=new Date(Math.round((cell.v-25569)*86400*1000));
+            v=d.toISOString().slice(0,10);
+          }
+        } else if(cell.t==='s'){
+          // Texto o formula de texto: .v tiene el valor calculado
+          v=cell.v!==undefined?cell.v:(cell.w||'');
+        } else if(cell.t==='n'){
+          // Numero: usar .v directamente
+          v=cell.v!==undefined?cell.v:'';
+        } else {
+          // Cualquier otro tipo: preferir .v luego .w
+          v=cell.v!==undefined?cell.v:(cell.w||'');
+        }
         if(v!==''&&v!==null&&v!==undefined)hasData=true;
       }
       obj[h]=v;
@@ -237,7 +251,7 @@ function normD(rows){
       cliente:String(r['CLIENTE']||'').trim(),
       rango:String(r['RANGO']||'').trim(),
       estado:String(r['ESTADO']||'').trim(),
-      cumple:(fD&&fA&&fD<=fA)?1:0,
+      cumple:(String(r['ESTADO']||'').trim()==='DESPACHADO'&&fD&&fA&&fD<=fA)?1:0,
     };
   }).filter(r=>r.op&&r.producto&&r.producto.length>1);
 }
