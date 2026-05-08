@@ -227,7 +227,8 @@ function readSheet(wb,name){
       }
       obj[h]=v;
     }
-    if(hasData)rows.push(obj);
+    // Incluir fila si tiene OP (no excluir pendientes sin fecha despacho)
+    if(obj[headers[0]]!==undefined&&obj[headers[0]]!=='')rows.push(obj);
   }
   return rows;
 }
