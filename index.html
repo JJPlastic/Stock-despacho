@@ -1,528 +1,343 @@
-<!-- ========================= -->
-<!-- REEMPLAZAR SOLO ESTA PARTE -->
-<!-- FUNCIONES CORREGIDAS -->
-<!-- ========================= -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control Stock y Despachos</title>
+
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+:root{
+--bg:#07090f;
+--s1:#0e1117;
+--s2:#141820;
+--s3:#1a1f2b;
+--brd:#1e2535;
+--acc:#3b82f6;
+--grn:#22c55e;
+--ylw:#f59e0b;
+--red:#ef4444;
+--pur:#a855f7;
+--txt:#dde4f0;
+--lt:#8b97b0;
+--mut:#4a5568;
+--font:'DM Sans',sans-serif;
+--head:'Bebas Neue',sans-serif
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+font-family:var(--font);
+background:var(--bg);
+color:var(--txt);
+min-height:100vh
+}
+</style>
+</head>
+
+<body>
 
 <script>
 
-/* =========================
-   NORMALIZADORES
-========================= */
+const SB_URL='https://feqveonxrptqqxowjaii.supabase.co';
+const SB_KEY='TU_KEY';
 
-function normEstado(v){
-  const s = String(v || '')
+let DESPACHO=[];
+
+function limpiarEstado(valor){
+
+    if(valor===null || valor===undefined) return 'PENDIENTE';
+
+    const txt = String(valor)
     .trim()
-    .toUpperCase();
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,'');
 
-  if(
-    s.includes('DESP')
-  ) return 'DESPACHADO';
+    if(
+        txt.includes('DESPACH')
+    ){
+        return 'DESPACHADO';
+    }
 
-  if(
-    s.includes('PEND') ||
-    s.includes('PROCES') ||
-    s.includes('PTE')
-  ) return 'PENDIENTE';
-
-  return 'PENDIENTE';
+    return 'PENDIENTE';
 }
 
-function normText(v){
-  return String(v || '')
+function limpiarTexto(v){
+    if(v===null || v===undefined) return '';
+
+    return String(v)
     .trim()
-    .toUpperCase();
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,'');
 }
-
-/* =========================
-   NUMEROS
-========================= */
-
-function toN(v){
-  if(v===''||v===null||v===undefined)return 0;
-
-  const n=parseFloat(
-    String(v)
-      .replace(/,/g,'.')
-      .replace(/[^\d.-]/g,'')
-  );
-
-  return isNaN(n)?0:n;
-}
-
-/* =========================
-   FECHAS
-========================= */
-
-function fmtD(v){
-
-  if(!v && v!==0) return '';
-
-  try{
-
-    // excel serial
-    if(typeof v==='number'){
-
-      const d = new Date(
-        Math.round((v-25569)*86400*1000)
-      );
-
-      return d.toISOString().slice(0,10);
-    }
-
-    // date
-    if(v instanceof Date){
-      return v.toISOString().slice(0,10);
-    }
-
-    const s = String(v).trim();
-
-    if(!s || s==='null') return '';
-
-    // dd/mm/yyyy
-    const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-
-    if(m){
-      return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-    }
-
-    // yyyy-mm-dd
-    if(/^\d{4}-\d{2}-\d{2}/.test(s)){
-      return s.slice(0,10);
-    }
-
-    return '';
-
-  }catch{
-    return '';
-  }
-}
-
-/* =========================
-   NORMALIZAR DESPACHO
-========================= */
 
 function normD(rows){
 
-  return rows
-    .filter(r=>{
+return rows
+.filter(r=>{
+    const op = String(r['OP-N°'] || r['OP-N'] || '').trim();
+    return op && op.length>1;
+})
+.map(r=>{
 
-      const op = String(
-        r['OP-N\u00b0'] ||
-        r['OP-N'] ||
-        ''
-      ).trim();
+    const estadoReal = limpiarEstado(r['ESTADO']);
 
-      return op && op.length > 1;
-    })
+    return{
 
-    .map(r=>{
+        op:String(r['OP-N°']||r['OP-N']||'').trim(),
 
-      const estado = normEstado(r['ESTADO']);
+        tipo:limpiarTexto(r['OP']),
 
-      const fD = fmtD(r['F. DESPACHO']);
-
-      const fA = fmtD(
-        r['F.COMPROMISO.AUT'] ||
-        r['F. COMPROMISO.AUT']
-      );
-
-      const cumple =
-        estado === 'DESPACHADO' &&
-        fD &&
-        fA &&
-        new Date(fD).getTime() <= new Date(fA).getTime()
-          ? 1
-          : 0;
-
-      return {
-
-        op:String(
-          r['OP-N\u00b0'] ||
-          r['OP-N'] ||
-          ''
-        ).trim(),
-
-        tipo:normText(
-          r['OP']
+        forma_pago:limpiarTexto(
+            r['FORMA.PAGO'] ||
+            r['FORMA DE PAGO'] ||
+            ''
         ),
-
-        forma_pago:normText(
-          r['FORMA.PAGO'] ||
-          r['FORMA DE PAGO']
-        ),
-
-        fecha_pedido:fmtD(
-          r['F. PEDIDO']
-        ),
-
-        fecha_compromiso:fmtD(
-          r['F. COMPROMISO']
-        ),
-
-        fecha_compromiso_aut:fA,
-
-        fecha_despacho:fD,
-
-        cantidad:toN(
-          r['Q']
-        ),
-
-        cod:String(
-          r['COD'] ||
-          ''
-        ).trim(),
 
         producto:String(
-          r['PRODUCTOS NO INDUSTRIALES'] ||
-          ''
+            r['PRODUCTOS NO INDUSTRIALES'] || ''
         ).trim(),
 
         cliente:String(
-          r['CLIENTE'] ||
-          ''
+            r['CLIENTE'] || ''
         ).trim(),
 
-        rango:normText(
-          r['RANGO']
-        ),
+        rango:limpiarTexto(r['RANGO']),
 
-        estado,
+        estado:estadoReal,
 
-        cumple
+        cantidad:Number(r['Q']) || 0
 
-      };
+    };
 
-    })
-
-    .filter(r=>
-      r.op &&
-      r.producto &&
-      r.producto.length > 1
-    );
+});
 }
-
-/* =========================
-   FILTRO DESPACHOS
-========================= */
 
 function dFilter(){
 
-  const q = $('d-q')
-    .value
-    .toLowerCase();
+    const q = limpiarTexto(
+        document.getElementById('d-q').value
+    );
 
-  const est = $('d-est').value;
+    const est = limpiarTexto(
+        document.getElementById('d-est').value
+    );
 
-  const op = $('d-op').value;
+    const op = limpiarTexto(
+        document.getElementById('d-op').value
+    );
 
-  const rng = $('d-rng').value;
+    const rng = limpiarTexto(
+        document.getElementById('d-rng').value
+    );
 
-  const mes = $('d-mes').value;
+    const fp = limpiarTexto(
+        document.getElementById('d-fp').value
+    );
 
-  const fp = $('d-fp').value;
+    const filtrado = DESPACHO.filter(d=>{
 
-  dData = DESPACHO.filter(d=>{
+        const texto = limpiarTexto(
+            d.op+' '+d.producto+' '+d.cliente
+        );
 
-    if(
-      q &&
-      !(
-        d.op +
-        ' ' +
-        d.producto +
-        ' ' +
-        d.cliente +
-        ' ' +
-        d.cod
-      )
-      .toLowerCase()
-      .includes(q)
-    ){
-      return false;
-    }
+        if(q && !texto.includes(q)){
+            return false;
+        }
 
-    // ESTADO
-    if(
-      est &&
-      normEstado(d.estado) !== est
-    ){
-      return false;
-    }
+        if(est && limpiarEstado(d.estado)!==est){
+            return false;
+        }
 
-    // TIPO
-    if(
-      op &&
-      d.tipo !== op
-    ){
-      return false;
-    }
+        if(op && limpiarTexto(d.tipo)!==op){
+            return false;
+        }
 
-    // RANGO
-    if(
-      rng &&
-      d.rango !== rng
-    ){
-      return false;
-    }
+        if(rng && limpiarTexto(d.rango)!==rng){
+            return false;
+        }
 
-    // FORMA PAGO
-    if(
-      fp &&
-      d.forma_pago !== fp
-    ){
-      return false;
-    }
+        if(fp && limpiarTexto(d.forma_pago)!==fp){
+            return false;
+        }
 
-    // MES
-    if(
-      mes &&
-      (
-        d.fecha_despacho ||
-        d.fecha_pedido ||
-        ''
-      ).slice(0,7)!==mes
-    ){
-      return false;
-    }
+        return true;
 
-    return true;
+    });
 
-  });
+    renderTabla(filtrado);
 
-  dPage = 1;
-
-  renderD();
 }
 
-/* =========================
-   RENDER DESPACHOS
-========================= */
+function renderTabla(data){
 
-function renderD(){
+    const body = document.getElementById('d-body');
 
-  const s = sArr(
-    dData,
-    dSK,
-    dSD
-  );
-
-  const tot = s.length;
-
-  const st = (dPage-1)*PER;
-
-  const pg = s.slice(
-    st,
-    st+PER
-  );
-
-  h(
-    'd-body',
-
-    pg.map(d=>`
+    body.innerHTML = data.map(d=>`
 
 <tr>
 
-<td class="bold">${d.op}</td>
+<td>${d.op}</td>
+
+<td>${d.tipo}</td>
+
+<td>${d.forma_pago}</td>
+
+<td>${d.producto}</td>
+
+<td>${d.cliente}</td>
+
+<td>${d.cantidad}</td>
 
 <td>
-  <span class="bd ${
-    d.tipo==='JJP'
-      ? 'bd-blu'
-      : 'bd-grn'
-  }">
-    ${d.tipo}
-  </span>
-</td>
-
-<td>${fpB(d.forma_pago)}</td>
-
-<td>${d.fecha_despacho || '-'}</td>
-
-<td>${d.fecha_compromiso_aut || '-'}</td>
-
-<td style="color:var(--mut);font-size:12px">
-  ${d.cod}
-</td>
-
-<td title="${d.producto}">
-  ${tr(d.producto,38)}
-</td>
-
-<td
- title="${d.cliente}"
- style="font-size:12px"
->
-  ${tr(d.cliente,32)}
-</td>
-
-<td class="right bold">
-  ${n(d.cantidad)}
-</td>
-
-<td>${rngB(d.rango)}</td>
-
-<td>${estB(d.estado)}</td>
-
-<td>
-
 ${
-  d.estado !== 'DESPACHADO'
-
-  ? '<span class="bd bd-gry">-</span>'
-
-  : d.cumple===1
-
-    ? '<span class="bd bd-grn">SI</span>'
-
-    : '<span class="bd bd-red">NO</span>'
+d.estado==='DESPACHADO'
+?
+'<span style="color:#22c55e;font-weight:bold">DESPACHADO</span>'
+:
+'<span style="color:#f59e0b;font-weight:bold">PENDIENTE</span>'
 }
-
 </td>
 
 </tr>
 
-`).join('')
-  );
+`).join('');
 
-  h(
-    'd-info',
-    'Mostrando '+
-    (st+1)+
-    '-'+
-    Math.min(st+PER,tot)+
-    ' de '+
-    n(tot)+
-    ' registros'
-  );
+}
 
-  pgn(
-    'd-pgn',
-    Math.ceil(tot/PER),
-    dPage,
-    p=>{
-      dPage=p;
-      renderD();
+async function loadData(){
+
+    try{
+
+        const r = await fetch(
+            SB_URL+'/rest/v1/excel_data?sheet_name=eq.DESPACHO',
+            {
+                headers:{
+                    apikey:SB_KEY,
+                    Authorization:'Bearer '+SB_KEY
+                }
+            }
+        );
+
+        const rows = await r.json();
+
+        DESPACHO = normD(
+            rows.map(x=>x.data)
+        );
+
+        renderTabla(DESPACHO);
+
+    }catch(err){
+
+        alert('ERROR: '+err.message);
+
     }
-  );
+
 }
 
-/* =========================
-   KPI RESUMEN
-========================= */
+document.body.innerHTML += `
 
-function buildR(){
+<div style="padding:20px">
 
-  const total = DESPACHO.length;
+<h1 style="margin-bottom:20px">
+DESPACHOS
+</h1>
 
-  const despachados = DESPACHO.filter(
-    d=>d.estado==='DESPACHADO'
-  );
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
 
-  const pendientes = DESPACHO.filter(
-    d=>d.estado==='PENDIENTE'
-  );
+<input
+id="d-q"
+placeholder="Buscar..."
+oninput="dFilter()"
+style="padding:10px"
+/>
 
-  const validOTIF = despachados.filter(
-    d=>
-      d.fecha_despacho &&
-      d.fecha_compromiso_aut
-  );
+<select
+id="d-est"
+onchange="dFilter()"
+style="padding:10px"
+>
+<option value="">TODOS</option>
+<option value="DESPACHADO">DESPACHADO</option>
+<option value="PENDIENTE">PENDIENTE</option>
+</select>
 
-  const otif = validOTIF.filter(
-    d=>d.cumple===1
-  ).length;
+<select
+id="d-op"
+onchange="dFilter()"
+style="padding:10px"
+>
+<option value="">TODOS</option>
+<option value="JJP">JJP</option>
+<option value="PTK">PTK</option>
+</select>
 
-  const crit = STOCK.filter(
-    s=>s.producir==='SI'
-  ).length;
+<select
+id="d-rng"
+onchange="dFilter()"
+style="padding:10px"
+>
+<option value="">TODOS</option>
+<option value="PLATINO">PLATINO</option>
+<option value="ORO">ORO</option>
+<option value="PLATA">PLATA</option>
+<option value="BRONCE">BRONCE</option>
+<option value="SIN RANGO">SIN RANGO</option>
+</select>
 
-  h('k-total',n(total));
+<select
+id="d-fp"
+onchange="dFilter()"
+style="padding:10px"
+>
+<option value="">TODOS</option>
+<option value="CREDITO">CREDITO</option>
+<option value="CONTADO">CONTADO</option>
+<option value="ADELANTO">ADELANTO</option>
+</select>
 
-  h('k-desp',n(despachados.length));
+</div>
 
-  h(
-    'k-desp-s',
-    pct(
-      despachados.length,
-      total
-    ) + ' del total'
-  );
+<table
+border="1"
+cellpadding="10"
+style="
+width:100%;
+border-collapse:collapse;
+background:#111827;
+color:white;
+"
+>
 
-  h(
-    'k-pend',
-    n(pendientes.length)
-  );
+<thead>
 
-  h(
-    'k-otif',
-    pct(
-      otif,
-      validOTIF.length
-    )
-  );
+<tr>
+<th>OP</th>
+<th>TIPO</th>
+<th>F.PAGO</th>
+<th>PRODUCTO</th>
+<th>CLIENTE</th>
+<th>CANT</th>
+<th>ESTADO</th>
+</tr>
 
-  h(
-    'k-crit',
-    String(crit)
-  );
-}
+</thead>
 
-/* =========================
-   BADGES
-========================= */
+<tbody id="d-body"></tbody>
 
-const estB=e=>{
+</table>
 
-  if(e==='DESPACHADO'){
-    return `
-      <span class="bd bd-grn">
-        Despachado
-      </span>
-    `;
-  }
+</div>
 
-  return `
-    <span class="bd bd-ylw">
-      Pendiente
-    </span>
-  `;
-};
+`;
 
-const fpB=f=>{
-
-  const m={
-    CREDITO:'bd-blu',
-    CONTADO:'bd-grn',
-    ADELANTO:'bd-pur'
-  };
-
-  return f
-    ? `
-      <span class="bd ${m[f]||'bd-gry'}">
-        ${f}
-      </span>
-    `
-    : `
-      <span style="color:var(--mut)">
-        -
-      </span>
-    `;
-};
-
-const rngB=r=>{
-
-  const m={
-    PLATINO:'bd-pur',
-    ORO:'bd-ylw',
-    PLATA:'bd-blu',
-    BRONCE:'bd-gry',
-    'SIN RANGO':'bd-gry'
-  };
-
-  return `
-    <span class="bd ${m[r]||'bd-gry'}">
-      ${r||'-'}
-    </span>
-  `;
-};
+loadData();
 
 </script>
+
+</body>
+</html>
