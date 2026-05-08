@@ -404,7 +404,7 @@ const sArr=(arr,k,d)=>[...arr].sort((a,b)=>{let av=a[k]??'',bv=b[k]??'';if(typeo
 const rngB=r=>{const m={PLATINO:'bd-pur',ORO:'bd-ylw',PLATA:'bd-blu',BRONCE:'bd-gry','SIN RANGO':'bd-gry'};return'<span class="bd '+(m[r]||'bd-gry')+'">'+(r||'-')+'</span>';};
 const estB=e=>e==='DESPACHADO'?'<span class="bd bd-grn">Despachado</span>':'<span class="bd bd-ylw">Pendiente</span>';
 const fpB=f=>{const m={CREDITO:'bd-blu',CONTADO:'bd-grn',ADELANTO:'bd-pur'};return f?'<span class="bd '+(m[f]||'bd-gry')+'">'+f+'</span>':'<span style="color:var(--mut)">-</span>';};
-function showND(show){$('no-data').style.display=show?'block':'none';document.querySelectorAll('.pg').forEach(p=>p.style.display=show?'none':'');if(!show)document.querySelector('.pg.on').style.display='block';}
+function showND(show){$('no-data').style.display=show?'block':'none';if(!show){document.querySelectorAll('.pg').forEach(p=>p.style.display=p.classList.contains('on')?'block':'none');}else{document.querySelectorAll('.pg').forEach(p=>p.style.display='none');}}
 function pgn(id,pages,cur,cb){
   const el=$(id);if(pages<=1){el.innerHTML='';return;}
   const s=Math.max(1,cur-2),e=Math.min(pages,cur+2);
@@ -415,7 +415,7 @@ function pgn(id,pages,cur,cb){
   h2+='<button onclick="('+cb+')('+Math.min(pages,cur+1)+')" '+(cur===pages?'disabled':'')+'>&#8250;</button>';
   el.innerHTML=h2;
 }
-function goPage(id,btn){document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('on'));$('pg-'+id).classList.add('on');btn.classList.add('on');}
+function goPage(id,btn){document.querySelectorAll('.pg').forEach(p=>{p.classList.remove('on');p.style.display='none';});document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('on'));const pg=$('pg-'+id);pg.classList.add('on');pg.style.display='block';btn.classList.add('on');}
 loadData();
 </script>
 </body>
