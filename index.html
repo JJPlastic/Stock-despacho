@@ -443,18 +443,18 @@ function onFile(file) {
       $('upload-progress').style.display = 'block';
       setProgress(5, 'Leyendo archivo Excel…');
 
-      const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+      const wb=XLSX.read(e.target.result,{type:'array',cellDates:true,cellFormula:false,raw:false});
       const findSheet = name => wb.SheetNames.find(s=>s.trim().toUpperCase()===name.toUpperCase());
       const sheetD = findSheet('DESPACHO'), sheetS = findSheet('STOCK');
       if (!sheetD) { alert('No se encontró la hoja DESPACHO.'); return; }
       if (!sheetS) { alert('No se encontró la hoja STOCK.'); return; }
 
       setProgress(15, 'Procesando DESPACHO…');
-      const rawD = XLSX.utils.sheet_to_json(wb.Sheets[sheetD], {defval:''});
+      const rawD=XLSX.utils.sheet_to_json(wb.Sheets[sheetD],{defval:'',raw:false});
       const normD = normalizeDespacho(rawD);
 
       setProgress(30, 'Procesando STOCK…');
-      const rawS = XLSX.utils.sheet_to_json(wb.Sheets[sheetS], {defval:''});
+      const rawS=XLSX.utils.sheet_to_json(wb.Sheets[sheetS],{defval:'',raw:false});
       
       const normS = normalizeStock(rawS);
 
