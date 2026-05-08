@@ -207,21 +207,18 @@ function readSheet(wb,name){
       let v='';
       if(cell){
         if(cell.t==='d'){
-          // Fecha: usar w (formateado) o reconstruir desde v (serial Excel)
+          // Fecha: usar w formateado o reconstruir desde serial
           if(cell.w){v=cell.w;}
           else if(typeof cell.v==='number'){
             const d=new Date(Math.round((cell.v-25569)*86400*1000));
             v=d.toISOString().slice(0,10);
           }
-        } else if(cell.t==='s'){
-          // Texto o formula de texto: .v tiene el valor calculado
-          v=cell.v!==undefined?cell.v:(cell.w||'');
-        } else if(cell.t==='n'){
-          // Numero: usar .v directamente
-          v=cell.v!==undefined?cell.v:'';
         } else {
-          // Cualquier otro tipo: preferir .v luego .w
-          v=cell.v!==undefined?cell.v:(cell.w||'');
+          // Para TODO lo demas (s, n, str, b, e):
+          // .v contiene el valor calculado (string, numero, etc)
+          // .w contiene el valor formateado como string
+          // Las formulas de texto tienen t='str' y .v = resultado
+          v=cell.v!==undefined&&cell.v!==null?cell.v:(cell.w||'');
         }
         if(v!==''&&v!==null&&v!==undefined)hasData=true;
       }
