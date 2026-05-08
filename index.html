@@ -533,20 +533,28 @@ function normalizeDespacho(rows){
 }
 function normalizeStock(rows){
   if(!rows||!rows.length) return [];
-  return rows
-    .map(r=>({
-      producto:           cl(r['DESCRIPCIÓN DEL PRODUCTO']||''),
-      color:              cl(r['COLOR']||''),
-      presentacion:       num(r['PRESENTACIÓN']||0),
-      stock_paq:          num(r['FISICO (PAQ)']||0),
-      stock_doc:          num(r['FISICO (DOC)']||0),
-      solicitado_doc:     num(r['SOLICITADO (DOC)']||0),
-      solicitado_paq:     num(r['SOLICITADO (PAQ)']||0),
-      producir:           cl(r['¿PRODUCIR?']||''),
-      stock_restante_doc: num(r['DISPONIBLE (DOC)']||0),
-      stock_restante_paq: num(r['DISPONIBLE (PAQ)']||0),
-    }))
-    .filter(r=>r.producto && r.producto.length>1);
+  return rows.map(r=>{
+    // Buscar cualquier clave que contenga estas palabras clave
+    const k = Object.keys(r);
+    const get = word => {
+      const key = k.find(x => x.replace(/[^a-zA-Z0-9]/g,'').toUpperCase()
+                    .includes(word.replace(/[^a-zA-Z0-9]/g,'').toUpperCase()));
+      return key ? r[key] : '';
+    };
+    const prod = String(get('DESCRIPCION')||'').trim();
+    return {
+      producto:           prod,
+      color:              String(get('COLOR')||'').trim(),
+      presentacion:       parseFloat(get('PRESENTACION'))||0,
+      stock_paq:          parseFloat(get('FISICOPAQ'))||0,
+      stock_doc:          parseFloat(get('FISICODOC'))||0,
+      solicitado_doc:     parseFloat(get('SOLICITADODOC'))||0,
+      solicitado_paq:     parseFloat(get('SOLICITADOPAQ'))||0,
+      producir:           String(get('PRODUCIR')||'').trim(),
+      stock_restante_doc: parseFloat(get('DISPONIBLEDOC'))||0,
+      stock_restante_paq: parseFloat(get('DISPONIBLEPAQ'))||0,
+    };
+  }).filter(r=>r.producto && r.producto.length>1);
 }
 
 function cl(v){return String(v??'').trim();}
